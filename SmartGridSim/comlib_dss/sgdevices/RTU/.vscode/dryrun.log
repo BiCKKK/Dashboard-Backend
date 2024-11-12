@@ -1,0 +1,94 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory '/home/intsec/InterSecureModel/comlib_dss/sgdevices/RTU'
+ 
+cd ../..; make -f Makefile
+ 
+make[1]: Entering directory '/home/intsec/InterSecureModel/comlib_dss'
+ 
+echo compiling linked_list.c
+mkdir -p build/src/common/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/common/linked_list.o src/common/linked_list.c
+echo compiling frame.c
+mkdir -p build/src/iec60870/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/iec60870/frame.o src/iec60870/frame.c
+echo compiling lib60870_common.c
+mkdir -p build/src/iec60870/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/iec60870/lib60870_common.o src/iec60870/lib60870_common.c
+echo compiling cs101_information_objects.c
+mkdir -p build/src/iec60870/cs101/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/iec60870/cs101/cs101_information_objects.o src/iec60870/cs101/cs101_information_objects.c
+echo compiling cs101_bcr.c
+mkdir -p build/src/iec60870/cs101/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/iec60870/cs101/cs101_bcr.o src/iec60870/cs101/cs101_bcr.c
+echo compiling cs101_asdu.c
+mkdir -p build/src/iec60870/cs101/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/iec60870/cs101/cs101_asdu.o src/iec60870/cs101/cs101_asdu.c
+echo compiling cs101_slave.c
+mkdir -p build/src/iec60870/cs101/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/iec60870/cs101/cs101_slave.o src/iec60870/cs101/cs101_slave.c
+echo compiling cs101_queue.c
+mkdir -p build/src/iec60870/cs101/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/iec60870/cs101/cs101_queue.o src/iec60870/cs101/cs101_queue.c
+echo compiling cs101_master_connection.c
+mkdir -p build/src/iec60870/cs101/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/iec60870/cs101/cs101_master_connection.o src/iec60870/cs101/cs101_master_connection.c
+ 
+echo compiling cs101_master.c
+mkdir -p build/src/iec60870/cs101/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/iec60870/cs101/cs101_master.o src/iec60870/cs101/cs101_master.c
+ 
+echo compiling cs104_frame.c
+mkdir -p build/src/iec60870/cs104/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/iec60870/cs104/cs104_frame.o src/iec60870/cs104/cs104_frame.c
+echo compiling cs104_slave.c
+mkdir -p build/src/iec60870/cs104/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/iec60870/cs104/cs104_slave.o src/iec60870/cs104/cs104_slave.c
+ 
+echo compiling cs104_connection.c
+mkdir -p build/src/iec60870/cs104/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/iec60870/cs104/cs104_connection.o src/iec60870/cs104/cs104_connection.c
+ 
+echo compiling link_layer.c
+mkdir -p build/src/iec60870/link_layer/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/iec60870/link_layer/link_layer.o src/iec60870/link_layer/link_layer.c
+ 
+echo compiling serial_transceiver_ft_1_2.c
+mkdir -p build/src/iec60870/link_layer/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/iec60870/link_layer/serial_transceiver_ft_1_2.o src/iec60870/link_layer/serial_transceiver_ft_1_2.c
+echo compiling buffer_frame.c
+mkdir -p build/src/iec60870/link_layer/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/iec60870/link_layer/buffer_frame.o src/iec60870/link_layer/buffer_frame.c
+ 
+echo compiling cpXXtime2a.c
+mkdir -p build/src/iec60870/apl/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/iec60870/apl/cpXXtime2a.o src/iec60870/apl/cpXXtime2a.c
+ 
+echo compiling socket_linux.c
+ 
+mkdir -p build/src/hal/socket/linux/
+ 
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/hal/socket/linux/socket_linux.o src/hal/socket/linux/socket_linux.c
+ 
+echo compiling thread_linux.c
+mkdir -p build/src/hal/thread/linux/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/hal/thread/linux/thread_linux.o src/hal/thread/linux/thread_linux.c
+ 
+echo compiling time.c
+mkdir -p build/src/hal/time/unix/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/hal/time/unix/time.o src/hal/time/unix/time.c
+ 
+echo compiling serial_port_linux.c
+mkdir -p build/src/hal/serial/linux/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/hal/serial/linux/serial_port_linux.o src/hal/serial/linux/serial_port_linux.c
+ 
+echo compiling lib_memory.c
+mkdir -p build/src/hal/memory/
+gcc -g  -std=gnu99 -Wstrict-prototypes -Wuninitialized  -Wsign-compare  -Wpointer-arith  -Wnested-externs  -Wmissing-declarations  -Wshadow -Wall -c -Iconfig -Isrc/inc/api -Isrc/inc/internal -Isrc/hal/inc -Isrc/common/inc -Itests/unity -o build/src/hal/memory/lib_memory.o src/hal/memory/lib_memory.c
+ 
+ar r ./build/lib60870.a ./build/src/common/linked_list.o ./build/src/iec60870/frame.o ./build/src/iec60870/lib60870_common.o ./build/src/iec60870/cs101/cs101_information_objects.o ./build/src/iec60870/cs101/cs101_bcr.o ./build/src/iec60870/cs101/cs101_asdu.o ./build/src/iec60870/cs101/cs101_slave.o ./build/src/iec60870/cs101/cs101_queue.o ./build/src/iec60870/cs101/cs101_master_connection.o ./build/src/iec60870/cs101/cs101_master.o ./build/src/iec60870/cs104/cs104_frame.o ./build/src/iec60870/cs104/cs104_slave.o ./build/src/iec60870/cs104/cs104_connection.o ./build/src/iec60870/link_layer/link_layer.o ./build/src/iec60870/link_layer/serial_transceiver_ft_1_2.o ./build/src/iec60870/link_layer/buffer_frame.o ./build/src/iec60870/apl/cpXXtime2a.o ./build/src/hal/socket/linux/socket_linux.o ./build/src/hal/thread/linux/thread_linux.o ./build/src/hal/time/unix/time.o ./build/src/hal/serial/linux/serial_port_linux.o ./build/src/hal/memory/lib_memory.o
+ranlib ./build/lib60870.a
+make[1]: Leaving directory '/home/intsec/InterSecureModel/comlib_dss'
+ 
+gcc -g   -g -o rtu rtu.c -I../../src/inc/api -I../../src/hal/inc -I../../src/tls -I../../src/GUI ../../build/lib60870.a -lpthread
+make: Leaving directory '/home/intsec/InterSecureModel/comlib_dss/sgdevices/RTU'
+ 
