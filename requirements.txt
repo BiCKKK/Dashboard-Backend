@@ -1,0 +1,13 @@
+alembic==1.14.0
+Flask==3.1.0
+Flask_Cors==5.0.0
+Flask_Migrate==4.0.7
+flask_sqlalchemy==3.1.1
+matplotlib==3.9.2
+mininet==2.3.0
+networkx==3.4.2
+protobuf==4.21.12
+pyelftools==0.30
+SQLAlchemy==2.0.35
+SQLAlchemy==2.0.36
+Twisted==24.10.0
