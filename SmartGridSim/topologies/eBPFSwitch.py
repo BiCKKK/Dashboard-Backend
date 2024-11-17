@@ -3,12 +3,19 @@ import subprocess
 
 class eBPFHost(Host):
     def config(self, **params):
-        r = super(Host, self).config(**params)
+        r = super(eBPFHost, self).config(**params)
+
+        print(f"Configuring eBPFHost {self.name}")
+        print(f"Default Interface: {self.defaultIntf()}")
 
         # Disable offloading
-        for off in ["rx", "tx", "sg"]:
-            cmd = "/sbin/ethtool --offload {} {} off".format(self.defaultIntf(), off)
-            self.cmd(cmd)
+        if self.defaultIntf():
+            for off in ["rx", "tx", "sg"]:
+                cmd = f"/sbin/ethtool --offload {self.defaultIntf()} {off} off"
+                print(f"Running command: {cmd}")
+                self.cmd(cmd)
+        else:
+            print(f"Warning: No default interface found for host {self.name}")
 
         return r
 

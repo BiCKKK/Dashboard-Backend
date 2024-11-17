@@ -8,6 +8,5 @@ mininet==2.3.0
 networkx==3.4.2
 protobuf==4.21.12
 pyelftools==0.30
-SQLAlchemy==2.0.35
 SQLAlchemy==2.0.36
 Twisted==24.10.0

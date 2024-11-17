@@ -6,6 +6,7 @@ from mininet.node import RemoteController
 from mininet.link import TCLink
 from mininet.clean import cleanup
 from eBPFSwitch import eBPFSwitch, eBPFHost
+from mininet.cli import CLI
 
 from shared import db
 from shared.models import Device, Link, EventLog
@@ -141,49 +142,33 @@ def smartGridSimNetwork(app):
 
 def stop_network(app):
     global net
-    if net:
-        net.stop()
-        net = None
-        cleanup()
-        logging.info("Network simulation stopped and resources cleaned up.")
-
-        with app.app_context():
-            Link.query.delete()
-            db.session.commit()
-            logging.info("Links removed from the database.")
-
-            EventLog.query.delete()
-            db.session.commit()
-            logging.info("Device logs removed from the database.")
-
-            Device.query.delete()
-            db.session.commit()
-            logging.info("Devices removed from the database.")
-    else:
-        # Even if simulation is not running.
-        cleanup()
-        logging.warning("No active simulation to stop.")
-
-        with app.app_context():
-            Link.query.delete()
-            db.session.commit()
-            logging.info("Links removed from the database.")
-
-            EventLog.query.delete()
-            db.session.commit()
-            logging.info("Device Logs removed from the database.")
-
-            Device.query.delete()
-            db.session.commit()
-            logging.info("Devices removed from the database.")
-
-def cleanup_sim():
     try:
-        cleanup()
-        logging.info("Mininet cleanup completed.")
-    except Exception as e:
-        logging.error(f"Error during Mininet cleanup: {e}")
+        if net:
+            net.stop()
+            cleanup()
+            logging.info("Network simulation stopped and resources cleaned up.")
 
+            with app.app_context():
+                Link.query.delete()
+                db.session.commit()
+                logging.info("Links removed from the database.")
+
+                EventLog.query.delete()
+                db.session.commit()
+                logging.info("Device logs removed from the database.")
+
+                Device.query.delete()
+                db.session.commit()
+                logging.info("Devices removed from the database.")
+
+            net = None
+            return True
+        else:
+            logging.warning("No active simulation to stop.")
+            return False
+    except Exception as e:
+        logging.error(f"Error during shutdown: {e}")
+    
 def start_goose_communication():
     global net
     if net is None:
