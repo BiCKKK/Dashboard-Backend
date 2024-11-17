@@ -3,36 +3,29 @@ import subprocess
 
 class eBPFHost(Host):
     def config(self, **params):
-        r = super(eBPFHost, self).config(**params)
-
-        print(f"Configuring eBPFHost {self.name}")
-        print(f"Default Interface: {self.defaultIntf()}")
+        r = super().config(**params)
 
         # Disable offloading
-        if self.defaultIntf():
-            for off in ["rx", "tx", "sg"]:
-                cmd = f"/sbin/ethtool --offload {self.defaultIntf()} {off} off"
-                print(f"Running command: {cmd}")
-                self.cmd(cmd)
-        else:
-            print(f"Warning: No default interface found for host {self.name}")
+        for off in ["rx", "tx", "sg"]:
+            cmd = "/sbin/ethtool --offload {} {} off".format(self.defaultIntf(), off)
+            self.cmd(cmd)
 
         return r
 
 class eBPFSwitch(Switch):
-    dpid = 1
+    dpid_counter = 1
 
     def __init__(self, name, switch_path='softswitch', dpid=None, **kwargs):
-        Switch.__init__(self, name, str(dpid), **kwargs) #F: Fixed missing DPID argument pass to Mininet 
+        super().__init__(name, dpid=str(dpid) if dpid else set(eBPFSwitch.dpid), **kwargs)
 
         self.switch_path = switch_path
 
         if dpid:
             self.dpid = dpid
-            eBPFSwitch.dpid = max(eBPFSwitch.dpid, dpid)
+            eBPFSwitch.dpid_counter = max(eBPFSwitch.dpid_counter, dpid + 1)
         else:
-            self.dpid = eBPFSwitch.dpid
-            eBPFSwitch.dpid += 1
+            self.dpid = eBPFSwitch.dpid_counter
+            eBPFSwitch.dpid_counter += 1
 
     @classmethod
     def setup(cls):
@@ -52,5 +45,7 @@ class eBPFSwitch(Switch):
         self.proc = subprocess.Popen(args)
 
     def stop(self):
-        print('stopping')
-        self.proc.kill()
+        print('Stopping eBPF Switch', self.name)
+        if hasattr(self, 'proc') and self.proc:
+            self.proc.kill()
+            self.proc = None

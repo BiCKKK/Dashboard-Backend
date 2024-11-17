@@ -8,7 +8,9 @@ if project_root not in sys.path:
 
 from flask import Flask
 from flask_cors import CORS
+from flask_socketio import SocketIO
 import logging
+from mininet.clean import cleanup
 
 from shared import db
 from shared.models import Device, Link, Function, DeviceFunction, EventLog, MonitoringData, PacketCapture, AssetDiscovery
@@ -30,8 +32,28 @@ db.init_app(app)
 from network_routes import network_routes
 
 # Register routes
-app.register_blueprint(network_routes)
+app.register_blueprint(network_routes, url_prefix='/api')
+
+# Initialise SocketIO
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+
+# Import and initialise network_sim.py with socketio
+import network_sim
+network_sim.init_socketio(socketio)
+
+# Ensure shutdown
+import atexit
+
+def shutdown():
+    logging.info("Shutting down application...")
+    # network_sim.stop_goose_communication()
+    # network_sim.stop_packet_capture()
+    network_sim.stop_network(app)
+    cleanup()
+    logging.info("Applicaiton shutdown complete.")
+
+atexit.register(shutdown)
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5100, debug=True)
+    socketio.run(app, host='127.0.0.1', port=5100, debug=True, use_reloader=False)
 

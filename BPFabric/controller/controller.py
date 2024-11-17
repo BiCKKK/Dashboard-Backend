@@ -30,15 +30,15 @@ class eBPFCLIApplication(eBPFCoreApplication):
     @staticmethod
     def get_switch_name(dpid):
         switch_names = {
-            1: "DSS1 GW",
-            2: "DSS2 GW",
-            3: "WAN R1",
-            4: "WAN R2",
-            5: "CONTROL SW",
-            6: "DPS GW",
-            7: "DPS RS",
-            8: "DPS HV",
-            9: "DPS MV"
+            1: "DSS1GW",
+            2: "DSS2GW",
+            3: "WANR1",
+            4: "WANR2",
+            5: "CONTROLSW",
+            6: "DPSGW",
+            7: "DPSRS",
+            8: "DPSHV",
+            9: "DPSMV"
         }
         return switch_names.get(dpid, "unknown")
 
