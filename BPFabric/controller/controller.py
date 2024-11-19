@@ -66,6 +66,13 @@ class eBPFCLIApplication(eBPFCoreApplication):
         logging.info("Twisted reactor started.")
         # Return self for reference if needed
         return self
+    
+    def stop(self):
+        """
+        Stops the controller and twisted reactor, and performs any necessary cleanup.
+        """
+        logging.info("Stopping controller and Twisted reactor.")
+        reactor.callFromThread(reactor.stop)
 
     @staticmethod
     def get_switch_name(dpid, db_session):

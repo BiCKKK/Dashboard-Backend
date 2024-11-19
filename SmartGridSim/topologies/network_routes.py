@@ -4,6 +4,8 @@ from threading import Thread
 import logging
 
 import network_sim
+from shared import db
+from shared.models import Device
 
 network_routes = Blueprint('network_routes', __name__)
 
@@ -22,3 +24,4 @@ def stop_sim():
         return jsonify({"status": "Simulation stopped and resources cleaned up."}), 200
     else:
         return jsonify({"error": "Failed to stop simulation."}), 400
+

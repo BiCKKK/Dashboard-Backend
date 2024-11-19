@@ -73,7 +73,7 @@ def smartGridSimNetwork(app):
         # Add links
         net.addLink(WANR2, CONTROLSW)
         net.addLink(WANR1, CONTROLSW)
-        net.addLink(CONTROL, CONTROLSW)
+        net.addLink(CONTROLSW, CONTROL)
         net.addLink(WANR1, DSS1GW, cls=TCLink , **MBPS)
         net.addLink(WANR2, DSS2GW, cls=TCLink , **MBPS)
         net.addLink(DPSGW, CONTROLSW)
@@ -108,7 +108,8 @@ def smartGridSimNetwork(app):
                         name=host.name,
                         device_type='host',
                         ip_address=host.IP(),
-                        mac_address=host.MAC()
+                        mac_address=host.MAC(),
+                        status='disconnected'
                     )
                     db.session.add(device)
             for switch in net.switches:
@@ -117,7 +118,8 @@ def smartGridSimNetwork(app):
                     device = Device(
                         name=switch.name,
                         device_type='switch',
-                        dpid=int(switch.dpid)
+                        dpid=int(switch.dpid),
+                        status='disconnected'
                     )
                     db.session.add(device)
             db.session.commit()

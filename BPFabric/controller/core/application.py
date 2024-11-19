@@ -29,3 +29,7 @@ class eBPFCoreApplication(object):
 
     def run(self):
         reactor.run()
+
+    def stop(self):
+        # Close all the connections
+        self.connections.clear()
