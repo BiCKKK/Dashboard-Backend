@@ -5,7 +5,7 @@ import logging
 
 from controller import eBPFCLIApplication, install_functions
 from shared import db
-from shared.models import Device
+from shared.models import Device, Link
 
 controller_routes = Blueprint('controller_routes', __name__)
 
@@ -49,6 +49,38 @@ def get_node_counts():
     except Exception as e:
         logging.error(f"Error getting node counts: {e}")
         return jsonify({"error": "Failed to retrieve node counts."}), 500
+    
+@controller_routes.route('/topology', methods=['GET'])
+def get_topology():
+    try:
+        # Fetch devices and links from the database
+        devices = Device.query.all()
+        links = Link.query.all()
+        # Serialize devices
+        devices_data = []
+        for device in devices:
+            devices_data.append({
+                'id': str(device.id),
+                'name': device.name,
+                'device_type': device.device_type,
+                'status': device.status,
+                'dpid': device.dpid,
+                'ip_address': device.ip_address,
+                'mac_address': device.mac_address,
+            })
+        # Serialize links
+        links_data = []
+        for link in links:
+            links_data.append({
+                'source_device_id': str(link.source_device_id),
+                'destination_device_id': str(link.destination_device_id),
+                'link_type': link.link_type,
+            })
+        return jsonify({'devices': devices_data, 'links': links_data}), 200
+    except Exception as e:
+        logging.error(f"Error getting topology: {e}")
+        return jsonify({'error': 'Failed to retrieve topology data.'}), 500
+
 
 @controller_routes.route('/status', methods=['GET'])
 def get_status():
