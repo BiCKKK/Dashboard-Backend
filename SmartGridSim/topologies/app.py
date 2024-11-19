@@ -13,7 +13,6 @@ import logging
 from mininet.clean import cleanup
 
 from shared import db
-from shared.models import Device, Link, Function, DeviceFunction, EventLog, MonitoringData, PacketCapture, AssetDiscovery
 from shared.config import Config
 
 app = Flask(__name__)
@@ -46,8 +45,6 @@ import atexit
 
 def shutdown():
     logging.info("Shutting down application...")
-    # network_sim.stop_goose_communication()
-    # network_sim.stop_packet_capture()
     network_sim.stop_network(app)
     cleanup()
     logging.info("Applicaiton shutdown complete.")
