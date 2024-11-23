@@ -10,7 +10,7 @@ from core import eBPFCoreApplication, set_event_handler
 from core.packets import *
 
 from shared import db
-from shared.models import Device, Function, DeviceFunction, EventLog, MonitoringData, PacketCapture, AssetDiscovery, GooseAnalysisData
+from shared.models import Device, DeviceFunction, EventLog, MonitoringData, PacketCapture, AssetDiscovery, GooseAnalysisData
 
 def extract_mac_address(packet_data):
     """
@@ -94,10 +94,6 @@ class eBPFCLIApplication(eBPFCoreApplication):
             logging.error(f"Error parsing value bytes and packets: {e}")
             return {"packets": 0, "bytes": 0}
 
-    @set_event_handler(Header.TABLES_LIST_REPLY)
-    def tables_list_reply(self, connection, pkt):
-        pass  # Implement if needed
-
     @set_event_handler(Header.TABLE_LIST_REPLY)
     def table_list_reply(self, connection, pkt):
         if pkt.entry.table_name == "assetdisc":
@@ -129,10 +125,6 @@ class eBPFCLIApplication(eBPFCoreApplication):
             for i in range(pkt.n_items):
                 value = struct.unpack_from(fmt, pkt.items, i * item_size)[0]
                 entries.append((i, value.hex()))
-
-    @set_event_handler(Header.TABLE_ENTRY_GET_REPLY)
-    def table_entry_get_reply(self, connection, pkt):
-        pass  # Implement if needed
 
     def monitoring_list(self, dpid, pkt):
         item_size = pkt.entry.key_size + pkt.entry.value_size
@@ -328,6 +320,23 @@ class eBPFCLIApplication(eBPFCoreApplication):
             logging.error("Unable to install this function")
         else:
             logging.info("Function has been installed")
+        try:
+            with self.app.app_context():
+                status = pkt.status
+                dpid = connection.dpid
+                device = Device.query.filter_by(dpid=dpid).first()
+                device_id = dpid if device else None
+
+                if status == FunctionAddReply.FunctionAddStatus.OK:
+                    logging.info(f"Function added successfully on device {device_id}.")
+                    function_name = pkt.name
+                    device_function = DeviceFunction(device_id=device_id, function_name=function_name, index=pkt.index)
+                    db.session.add(device_function)
+                    db.session.commit()
+                else:
+                    logging.error(f"Function addition failed on device {device_id}, status: {status}")
+        except Exception as e:
+            logging.error(f"Error handling function add reply: {e}")
                
     @set_event_handler(Header.FUNCTION_REMOVE_REPLY)
     def function_remove_reply(self, connection, pkt):
@@ -335,6 +344,28 @@ class eBPFCLIApplication(eBPFCoreApplication):
             logging.error("Cannot remove a function at this index")
         else:
             logging.info("Function has been removed")
+        try: 
+            with self.app.app_context():
+                status = pkt.status
+                dpid = connection.dpid
+                index = pkt.index
+                function_name = pkt.name
+
+                device = Device.query.filter_by(dpid=dpid).first()
+                device_id = dpid if device else None
+
+                if status == FunctionRemoveReply.FunctionRemoveStatus.OK:
+                    logging.info(f"Function '{function_name}' removed successfully from device {device_id} at index {index}.")
+
+                    device_function = DeviceFunction.query.filter_by(device_id=device_id, index=index).first()
+                    if device_function:
+                        db.session.delete(device_function)
+                        db.session.commit()
+                else:
+                    logging.error(f"Function removal failed on device {device_id} at index {index}, status: {status}.")
+
+        except Exception as e:
+            logging.error(f"Error handling Function_remove_reply: {e}")
 
     @set_event_handler(Header.HELLO)
     def hello(self, connection, pkt):
@@ -343,10 +374,16 @@ class eBPFCLIApplication(eBPFCoreApplication):
         """
         try:
             with self.app.app_context():
-                dpid = connection.dpid
+                dpid = pkt.dpid
+                version = pkt.version
+                logging.info(f"Received HELLO from device with DPID: {dpid}, version: {version}")
+
                 switch_name = self.get_switch_name(dpid, db_session=db.session)
                 logging.info(f"New device connected: {switch_name} (DPID: {dpid})")
 
+                if switch_name == "unknown":
+                    logging.info(f"Device with DPID {dpid} is new. Default name assigned.")
+                    
                 # Update or add the Device record
                 device = Device.query.filter_by(dpid=dpid).first()
                 if device:
@@ -392,54 +429,3 @@ def start_monitoring(app, connections):
 
     thread = Thread(target=threaded_mon_timer)
     thread.start()
-
-def install_functions(app):
-    logging.info('Installing SGSim orchestration functions...')
-    eBPFApp = app.eBPFApp
-    if len(eBPFApp.connected_devices) >= 9:
-        logging.info('All networking devices connected.')
-        # Function install logic
-        functions_to_install = [
-            {"name": "forwarding", "index": "0", "path": "../functions/forwarding.o"},
-            {"name": "monitor", "index": "1", "path": "../functions/monitoring.o"},
-            {"name": "assetdisc", "index": "2", "path": "../functions/asset_discovery.o"},
-            {"name": "goose_analyser", "index": "3", "path": "../functions/goose_analyser.o"},
-            {"name": "block", "index": "4", "path": "../functions/block.o"},
-            {"name": "dos_mitigation", "index": "5", "path": "../functions/dos_mitigation.o"},
-            {"name": "mirroring", "index": "6", "path": "../functions/mirror.o"}
-        ]
-        for func in functions_to_install:
-            try:
-                with open(func["path"], 'rb') as f:
-                    elf = f.read()
-                    for dpid in eBPFApp.connections:
-                        eBPFApp.connections[dpid].send(FunctionAddRequest(name="func", index=func["index"], elf=elf))
-                    time.sleep(1)
-                    logging.info(f"Function {func['name']} installed on all devices...")
-            except Exception as e:
-                logging.error(f"Error installing function {func['name']}: {e}")
-
-        # Start monitoring after functions are installed
-        start_monitoring(app, eBPFApp.connections)
-
-        # Log event
-        with app.app_context():
-            event = EventLog(
-                timestamp=datetime.datetime.now(),
-                message="All functions installed successfully.",
-                event_type='INFO'
-            )
-            db.session.add(event)
-            db.session.commit()
-    else:
-        logging.error('Could not verify connected devices.')
-        with app.app_context():
-            event = EventLog(
-                timestamp=datetime.datetime.now(),
-                message="Functions installation failed.",
-                event_type='ERROR'
-            )
-            db.session.add(event)
-            db.session.commit()
-
-

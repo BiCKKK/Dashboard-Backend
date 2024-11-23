@@ -14,6 +14,8 @@ from mininet.clean import cleanup
 
 from shared import db
 from shared.config import Config
+from network_routes import network_routes
+import network_sim
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS to allow requests from different origins
@@ -27,18 +29,15 @@ app.config.from_object(Config)
 # Initialise database
 db.init_app(app)
 
-# Import routes
-from network_routes import network_routes
-
 # Register routes
 app.register_blueprint(network_routes, url_prefix='/api')
 
 # Initialise SocketIO
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+# socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # Import and initialise network_sim.py with socketio
-import network_sim
-network_sim.init_socketio(socketio)
+# import network_sim
+# network_sim.init_socketio(socketio)
 
 # Ensure shutdown
 import atexit
@@ -52,5 +51,5 @@ def shutdown():
 atexit.register(shutdown)
 
 if __name__ == '__main__':
-    socketio.run(app, host='127.0.0.1', port=5100, debug=True, use_reloader=False)
+    app.run(host='127.0.0.1', port=5100, debug=True, use_reloader=False)
 

@@ -1,6 +1,7 @@
 from . import db
 from sqlalchemy.dialects.postgresql import JSON, BYTEA
 from datetime import datetime
+from datetime import timezone
  
  
 class Device(db.Model):
@@ -36,16 +37,16 @@ class Link(db.Model):
 	destination_device = db.relationship('Device', foreign_keys=[destination_device_id], backref='destination_links')
  
  
-class Function(db.Model):
-	__tablename__ = 'functions'
+# class Function(db.Model):
+# 	__tablename__ = 'functions'
  
-	id = db.Column(db.Integer, primary_key=True)
-	name = db.Column(db.String(50), unique=True, nullable=False)
-	description = db.Column(db.String(200), nullable=True)
-	binary_path = db.Column(db.String(200), nullable=False)
-	index = db.Column(db.Integer, nullable=False)
+# 	id = db.Column(db.Integer, primary_key=True)
+# 	name = db.Column(db.String(50), unique=True, nullable=False)
+# 	description = db.Column(db.String(200), nullable=True)
+# 	binary_path = db.Column(db.String(200), nullable=False)
+# 	index = db.Column(db.Integer, nullable=False)
  
-	device_functions = db.relationship('DeviceFunction', back_populates='function', cascade='all, delete-orphan')
+# 	device_functions = db.relationship('DeviceFunction', back_populates='function', cascade='all, delete-orphan')
  
  
 class DeviceFunction(db.Model):
@@ -53,13 +54,11 @@ class DeviceFunction(db.Model):
  
 	id = db.Column(db.Integer, primary_key=True)
 	device_id = db.Column(db.Integer, db.ForeignKey('devices.id', ondelete='CASCADE'), nullable=False)
-	function_id = db.Column(db.Integer, db.ForeignKey('functions.id', ondelete='CASCADE'), nullable=False)
-	status = db.Column(db.String(20), nullable=False)  # e.g., 'installed', 'uninstalled'
-	installed_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+	function_name = db.Column(db.String(100))
+	status = db.Column(db.String(20))  
+	index = db.Column(db.Integer)
  
 	device = db.relationship('Device', back_populates='functions')
-	function = db.relationship('Function', back_populates='device_functions')
- 
  
 class EventLog(db.Model):
 	__tablename__ = 'event_logs'

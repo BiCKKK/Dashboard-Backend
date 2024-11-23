@@ -1,11 +1,13 @@
-from flask import Blueprint, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app
 from threading import Thread
 import json
 import logging
 
-from controller import eBPFCLIApplication, install_functions
+from controller import eBPFCLIApplication
 from shared import db
 from shared.models import Device, Link
+
+from core.packets import *
 
 controller_routes = Blueprint('controller_routes', __name__)
 
@@ -87,5 +89,60 @@ def get_status():
     pass
 
 @controller_routes.route('/install', methods=['POST'])
-def install():
-    pass
+def install_function():
+    try:
+        data = request.get_json()
+        device_id = data.get('device_id')
+        function_name = data.get('function_name')
+        function_index = data.get('function_index', 0)  # Default to 0 if not provided
+        if not device_id or not function_name:
+            return jsonify({'error': 'device_id and function_name are required'}), 400
+        app = current_app._get_current_object()
+        if not hasattr(app, 'eBPFApp'):
+            return jsonify({'error': 'Controller is not running'}), 400
+        controller = app.eBPFApp
+        # Get the connection to the device
+        connection = controller.connections.get(int(device_id))
+        if not connection:
+            return jsonify({'error': f'Device {device_id} is not connected'}), 400
+        # Read the ELF file for the function
+        elf_file_path = f'../functions/{function_name}.o'
+        try:
+            with open(elf_file_path, 'rb') as f:
+                elf = f.read()
+        except FileNotFoundError:
+            return jsonify({'error': f'Function ELF file not found: {elf_file_path}'}), 404
+        # Send the FunctionAddRequest
+        function_add_request = FunctionAddRequest(name=function_name, index=function_index, elf=elf)
+        connection.send(function_add_request)
+        logging.info(f"Function installation request sent to device {device_id} for function {function_name}.")
+        return jsonify({'message': f'Function installation initiated on device {device_id}'}), 200
+    except Exception as e:
+        logging.error(f"Error installing function: {e}")
+        return jsonify({'error': 'Failed to initiate function installation'}), 500
+
+@controller_routes.route('/remove', methods=['POST'])
+def remove_function():
+    try:
+        data = request.get_json()
+        device_id = data.get('device_id')
+        function_index = data.get('function_index', 0)  # Index from which to remove the function
+        if not device_id:
+            return jsonify({'error': 'device_id is required'}), 400
+        app = current_app._get_current_object()
+        if not hasattr(app, 'eBPFApp'):
+            return jsonify({'error': 'Controller is not running'}), 400
+        controller = app.eBPFApp
+        # Get the connection to the device
+        connection = controller.connections.get(int(device_id))
+        if not connection:
+            return jsonify({'error': f'Device {device_id} is not connected'}), 400
+        # Send the FunctionRemoveRequest
+        function_remove_request = FunctionRemoveRequest(index=function_index)
+        connection.send(function_remove_request)
+        logging.info(f"Function removal request sent to device {device_id} at index {function_index}.")
+        return jsonify({'message': f'Function removal initiated on device {device_id}'}), 200
+    except Exception as e:
+        logging.error(f"Error removing function: {e}")
+        return jsonify({'error': 'Failed to initiate function removal'}), 500
+
