@@ -325,7 +325,7 @@ class eBPFCLIApplication(eBPFCoreApplication):
                 status = pkt.status
                 dpid = connection.dpid
                 device = Device.query.filter_by(dpid=dpid).first()
-                device_id = dpid if device else None
+                device_id = device.id if device else None
 
                 if status == FunctionAddReply.FunctionAddStatus.OK:
                     logging.info(f"Function added successfully on device {device_id}.")
@@ -352,7 +352,7 @@ class eBPFCLIApplication(eBPFCoreApplication):
                 function_name = pkt.name
 
                 device = Device.query.filter_by(dpid=dpid).first()
-                device_id = dpid if device else None
+                device_id = device.id if device else None
 
                 if status == FunctionRemoveReply.FunctionRemoveStatus.OK:
                     logging.info(f"Function '{function_name}' removed successfully from device {device_id} at index {index}.")

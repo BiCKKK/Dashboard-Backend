@@ -5,7 +5,7 @@ import logging
 
 from controller import eBPFCLIApplication
 from shared import db
-from shared.models import Device, Link
+from shared.models import Device, Link, DeviceFunction
 
 from core.packets import *
 
@@ -69,6 +69,14 @@ def get_topology():
                 'dpid': device.dpid,
                 'ip_address': device.ip_address,
                 'mac_address': device.mac_address,
+                'functions': [
+                    {
+                        'id': func.id,
+                        'function_name': func.function_name,
+                        'status': func.status,
+                        'index': func.index
+                    } for func in device.functions
+                ]
             })
         # Serialize links
         links_data = []
@@ -92,19 +100,30 @@ def get_status():
 def install_function():
     try:
         data = request.get_json()
-        device_id = data.get('device_id')
+        logging.info(f"Received data: {data}")
+        dpid = data.get('dpid')
         function_name = data.get('function_name')
-        function_index = data.get('function_index', 0)  # Default to 0 if not provided
-        if not device_id or not function_name:
-            return jsonify({'error': 'device_id and function_name are required'}), 400
+
+        if not dpid or function_name is None:
+            return jsonify({'error': 'dpid and function_name are required'}), 400
+        
         app = current_app._get_current_object()
         if not hasattr(app, 'eBPFApp'):
             return jsonify({'error': 'Controller is not running'}), 400
+        
         controller = app.eBPFApp
+
         # Get the connection to the device
-        connection = controller.connections.get(int(device_id))
+        connection = controller.connections.get(int(dpid))
         if not connection:
-            return jsonify({'error': f'Device {device_id} is not connected'}), 400
+            return jsonify({'error': f'Device {dpid} is not connected'}), 400
+        device = Device.query.filter_by(dpid=int(dpid)).first()
+
+        if not device:
+            return jsonify({'error': f'Device {dpid} not found in the database.'}), 404
+        
+        next_index = len(device.functions)
+
         # Read the ELF file for the function
         elf_file_path = f'../functions/{function_name}.o'
         try:
@@ -112,11 +131,23 @@ def install_function():
                 elf = f.read()
         except FileNotFoundError:
             return jsonify({'error': f'Function ELF file not found: {elf_file_path}'}), 404
+        
         # Send the FunctionAddRequest
-        function_add_request = FunctionAddRequest(name=function_name, index=function_index, elf=elf)
+        function_add_request = FunctionAddRequest(name=function_name, index=next_index, elf=elf)
         connection.send(function_add_request)
-        logging.info(f"Function installation request sent to device {device_id} for function {function_name}.")
-        return jsonify({'message': f'Function installation initiated on device {device_id}'}), 200
+        logging.info(f"Function installation request sent to device {dpid} for function {function_name}.")
+
+        new_function = DeviceFunction(
+            device_id=device.id,
+            function_name=function_name,
+            status='installed',
+            index=next_index
+        )
+        db.session.add(new_function)
+        db.session.commit()
+
+        return jsonify({'message': f'Function installation initiated on device {dpid}'}), 200
+    
     except Exception as e:
         logging.error(f"Error installing function: {e}")
         return jsonify({'error': 'Failed to initiate function installation'}), 500
@@ -125,23 +156,23 @@ def install_function():
 def remove_function():
     try:
         data = request.get_json()
-        device_id = data.get('device_id')
+        dpid = data.get('dpid')
         function_index = data.get('function_index', 0)  # Index from which to remove the function
-        if not device_id:
+        if not dpid:
             return jsonify({'error': 'device_id is required'}), 400
         app = current_app._get_current_object()
         if not hasattr(app, 'eBPFApp'):
             return jsonify({'error': 'Controller is not running'}), 400
         controller = app.eBPFApp
         # Get the connection to the device
-        connection = controller.connections.get(int(device_id))
+        connection = controller.connections.get(int(dpid))
         if not connection:
-            return jsonify({'error': f'Device {device_id} is not connected'}), 400
+            return jsonify({'error': f'Device {dpid} is not connected'}), 400
         # Send the FunctionRemoveRequest
         function_remove_request = FunctionRemoveRequest(index=function_index)
         connection.send(function_remove_request)
-        logging.info(f"Function removal request sent to device {device_id} at index {function_index}.")
-        return jsonify({'message': f'Function removal initiated on device {device_id}'}), 200
+        logging.info(f"Function removal request sent to device {dpid} at index {function_index}.")
+        return jsonify({'message': f'Function removal initiated on device {dpid}'}), 200
     except Exception as e:
         logging.error(f"Error removing function: {e}")
         return jsonify({'error': 'Failed to initiate function removal'}), 500

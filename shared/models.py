@@ -64,7 +64,7 @@ class EventLog(db.Model):
 	__tablename__ = 'event_logs'
  
 	id = db.Column(db.Integer, primary_key=True)
-	timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+	timestamp = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=False)
 	device_id = db.Column(db.Integer, db.ForeignKey('devices.id', ondelete='SET NULL'), nullable=True)
 	message = db.Column(db.String(500), nullable=False)
 	event_type = db.Column(db.String(20), nullable=False)  # 'INFO', 'ERROR', etc.
@@ -77,7 +77,7 @@ class MonitoringData(db.Model):
 	__tablename__ = 'monitoring_data'
  
 	id = db.Column(db.Integer, primary_key=True)
-	timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+	timestamp = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=False)
 	device_id = db.Column(db.Integer, db.ForeignKey('devices.id', ondelete='CASCADE'), nullable=False)
 	mac_address = db.Column(db.String(17), nullable=False)
 	bandwidth = db.Column(db.Integer, nullable=False)  # bytes per second
@@ -93,7 +93,7 @@ class GooseAnalysisData(db.Model):
 	__tablename__ = 'goose_analysis_data'
  
 	id = db.Column(db.Integer, primary_key=True)
-	timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+	timestamp = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=False)
 	device_id = db.Column(db.Integer, db.ForeignKey('devices.id', ondelete='CASCADE'), nullable=False)
 	mac_address = db.Column(db.String(17), nullable=False)
 	stNum = db.Column(db.String(8), nullable=True)
@@ -110,7 +110,7 @@ class PacketCapture(db.Model):
 	__tablename__ = 'packet_captures'
  
 	id = db.Column(db.Integer, primary_key=True)
-	timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+	timestamp = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=False)
 	device_id = db.Column(db.Integer, db.ForeignKey('devices.id', ondelete='CASCADE'), nullable=False)
 	packet_data = db.Column(BYTEA, nullable=False)
 	source_ip = db.Column(db.String(15), nullable=False)
@@ -124,7 +124,7 @@ class AssetDiscovery(db.Model):
 	__tablename__ = 'asset_discovery'
  
 	id = db.Column(db.Integer, primary_key=True)
-	timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+	timestamp = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=False)
 	switch_id = db.Column(db.Integer, db.ForeignKey('devices.id', ondelete='CASCADE'), nullable=False)
 	mac_address = db.Column(db.String(17), nullable=False)
 	bytes = db.Column(db.Integer, nullable=False)
