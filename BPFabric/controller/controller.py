@@ -57,6 +57,7 @@ class eBPFCLIApplication(eBPFCoreApplication):
         self.connected_devices = set()
         self.connections = {}
         self.monitoring_cache = {} # To track previous bytes for bandwidth calculation
+        self.pending_functions ={}
 
     def run(self):
         """
@@ -328,15 +329,39 @@ class eBPFCLIApplication(eBPFCoreApplication):
                 device_id = device.id if device else None
 
                 if status == FunctionAddReply.FunctionAddStatus.OK:
-                    logging.info(f"Function added successfully on device {device_id}.")
-                    function_name = pkt.name
-                    device_function = DeviceFunction(device_id=device_id, function_name=function_name, index=pkt.index)
-                    db.session.add(device_function)
-                    db.session.commit()
+                    logging.info(f"FunctionAddReply received: name={pkt.name}, index={pkt.index}, status={pkt.index}.")
+                    function_name = pkt.name or self.pending_functions.get((dpid, pkt.index))
+                    if not function_name:
+                        logging.error(f"Function name is missing for device {device_id} at index {pkt.index}.")
+                        return
+
+                    existing_function = DeviceFunction.query.filter_by(device_id=device_id, function_name=function_name, index=pkt.index).first()
+                    if not existing_function:
+                        device_function = DeviceFunction(device_id=device_id, function_name=function_name, index=pkt.index, status="installed")
+                        db.session.add(device_function)
+                        db.session.commit()
+                        logging.info(f"Fucntion {function_name} added succesfully to device {device_id}")
+                    else:
+                        logging.error(f"Function addition failed on device {device_id}, status: {status}")
+
+                    self.pending_functions.pop((dpid, pkt.index), None)
                 else:
-                    logging.error(f"Function addition failed on device {device_id}, status: {status}")
+                    logging.error(f"Function addition failed for device {device_id}, status: {status}")
+                
         except Exception as e:
             logging.error(f"Error handling function add reply: {e}")
+
+    def send_function_add_request(self, connection, request):
+        try:
+            dpid = connection.dpid
+            function_name = request.name
+            index = request.index
+
+            self.pending_functions[(dpid, index)] = function_name
+            connection.send(request)
+            logging.info(f"Function add request sent: name={function_name}, index={index}")
+        except Exception as e:
+            logging.error(f"Error sending FunctionAddRequest: {e}")
                
     @set_event_handler(Header.FUNCTION_REMOVE_REPLY)
     def function_remove_reply(self, connection, pkt):

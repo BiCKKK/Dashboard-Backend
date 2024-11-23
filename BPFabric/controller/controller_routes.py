@@ -137,14 +137,14 @@ def install_function():
         connection.send(function_add_request)
         logging.info(f"Function installation request sent to device {dpid} for function {function_name}.")
 
-        new_function = DeviceFunction(
-            device_id=device.id,
-            function_name=function_name,
-            status='installed',
-            index=next_index
-        )
-        db.session.add(new_function)
-        db.session.commit()
+        # new_function = DeviceFunction(
+        #     device_id=device.id,
+        #     function_name=function_name,
+        #     status='installed',
+        #     index=next_index
+        # )
+        # db.session.add(new_function)
+        # db.session.commit()
 
         return jsonify({'message': f'Function installation initiated on device {dpid}'}), 200
     

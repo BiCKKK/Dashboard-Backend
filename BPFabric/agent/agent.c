@@ -184,6 +184,8 @@ int recv_function_add(void *buffer, struct header *header)
 
     FunctionAddReply reply = FUNCTION_ADD_REPLY__INIT;
     reply.status = FUNCTION_ADD_REPLY__FUNCTION_ADD_STATUS__OK;
+    reply.index = request->index;
+    reply.name = strdup(request->name);
 
     // Validate the input
     if (request->index >= PIPELINE_STAGES)
@@ -206,8 +208,8 @@ int recv_function_add(void *buffer, struct header *header)
 
         // Create the new VM
         stage->vm = ubpf_create();
-        strncpy(stage->name, request->name, 32);
-        stage->name[31] = '\0';
+        strncpy(stage->name, request->name, sizeof(stage->name) - 1);
+        stage->name[sizeof(stage->name) - 1] = '\0';
         ubpf_toggle_bounds_check(stage->vm, false);
 
         // Register the map functions
@@ -254,6 +256,7 @@ int recv_function_add(void *buffer, struct header *header)
 
     // Free the resources
     function_add_request__free_unpacked(request, NULL);
+    free(reply.name);
     free(packet);
 
     return len;
