@@ -186,7 +186,7 @@ def stop_network(app):
             logging.info("Network simulation stopped and resources cleaned up.")
 
             with app.app_context():
-                tables = ['links', 'event_logs', 'devices']
+                tables = ['links', 'event_logs', 'device_functions', 'devices']
                 truncate_stmt = f"TRUNCATE TABLE {', '.join(tables)} RESTART IDENTITY CASCADE;"
 
                 db.session.execute(text(truncate_stmt))

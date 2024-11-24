@@ -137,15 +137,6 @@ def install_function():
         connection.send(function_add_request)
         logging.info(f"Function installation request sent to device {dpid} for function {function_name}.")
 
-        # new_function = DeviceFunction(
-        #     device_id=device.id,
-        #     function_name=function_name,
-        #     status='installed',
-        #     index=next_index
-        # )
-        # db.session.add(new_function)
-        # db.session.commit()
-
         return jsonify({'message': f'Function installation initiated on device {dpid}'}), 200
     
     except Exception as e:
@@ -157,22 +148,35 @@ def remove_function():
     try:
         data = request.get_json()
         dpid = data.get('dpid')
-        function_index = data.get('function_index', 0)  # Index from which to remove the function
-        if not dpid:
-            return jsonify({'error': 'device_id is required'}), 400
+        function_index = data.get('function_index')  
+
+        if not dpid or function_index is None:
+            return jsonify({'error': 'device_id and function_index is required'}), 400
+        
+        device = Device.query.filter_by(dpid=int(dpid)).first()
+        if not device:
+            return jsonify({'error': f'Device {dpid} not found in teh database.'}), 404
+        function = DeviceFunction.query.filter_by(device_id=device.id,index=function_index).first()
+        if not function:
+            return jsonify({'error': f'Function at index {function_index} not found on device {dpid}.'}), 404
+        
         app = current_app._get_current_object()
         if not hasattr(app, 'eBPFApp'):
             return jsonify({'error': 'Controller is not running'}), 400
+        
         controller = app.eBPFApp
         # Get the connection to the device
         connection = controller.connections.get(int(dpid))
         if not connection:
             return jsonify({'error': f'Device {dpid} is not connected'}), 400
+        
         # Send the FunctionRemoveRequest
         function_remove_request = FunctionRemoveRequest(index=function_index)
         connection.send(function_remove_request)
+
         logging.info(f"Function removal request sent to device {dpid} at index {function_index}.")
         return jsonify({'message': f'Function removal initiated on device {dpid}'}), 200
+    
     except Exception as e:
         logging.error(f"Error removing function: {e}")
         return jsonify({'error': 'Failed to initiate function removal'}), 500

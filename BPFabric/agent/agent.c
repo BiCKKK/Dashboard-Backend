@@ -271,6 +271,8 @@ int recv_function_remove(void *buffer, struct header *header)
     int len = function_remove_request__get_packed_size(request);
 
     reply.status = FUNCTION_REMOVE_REPLY__FUNCTION_REMOVE_STATUS__INVALID_STAGE;
+    reply.index = request->index;
+    
     if (request->index <= PIPELINE_STAGES && pipeline[request->index].vm != NULL)
     {
         struct stage *stage = &pipeline[request->index];

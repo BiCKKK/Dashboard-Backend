@@ -365,27 +365,27 @@ class eBPFCLIApplication(eBPFCoreApplication):
                
     @set_event_handler(Header.FUNCTION_REMOVE_REPLY)
     def function_remove_reply(self, connection, pkt):
-        if pkt.status == FunctionAddReply.FunctionAddStatus.INVALID_STAGE:
-            logging.error("Cannot remove a function at this index")
+        if pkt.status == FunctionRemoveReply.FunctionRemoveStatus.INVALID_STAGE:
+            logging.error("Cannot remove a function from this index.")
         else:
-            logging.info("Function has been removed")
+            logging.info("Function has been removed successfully.")
         try: 
             with self.app.app_context():
-                status = pkt.status
                 dpid = connection.dpid
+                status = pkt.status
                 index = pkt.index
-                function_name = pkt.name
 
                 device = Device.query.filter_by(dpid=dpid).first()
                 device_id = device.id if device else None
 
                 if status == FunctionRemoveReply.FunctionRemoveStatus.OK:
-                    logging.info(f"Function '{function_name}' removed successfully from device {device_id} at index {index}.")
-
-                    device_function = DeviceFunction.query.filter_by(device_id=device_id, index=index).first()
-                    if device_function:
-                        db.session.delete(device_function)
-                        db.session.commit()
+                    logging.info(f"Function at index {index} removed successfully from device {device_id}.")
+                    
+                    if index is not None:
+                        device_function = DeviceFunction.query.filter_by(device_id=device_id, index=index).first()
+                        if device_function:
+                            db.session.delete(device_function)
+                            db.session.commit()
                 else:
                     logging.error(f"Function removal failed on device {device_id} at index {index}, status: {status}.")
 

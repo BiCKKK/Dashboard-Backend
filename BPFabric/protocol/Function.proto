@@ -30,7 +30,6 @@ message FunctionRemoveReply {
 
     FunctionRemoveStatus status = 1;
     uint32 index = 2;
-    string name = 3;
 }
 
 message FunctionListEntry {
