@@ -151,26 +151,33 @@ def remove_function():
         function_index = data.get('function_index')  
 
         if not dpid or function_index is None:
+            logging.error("Missing required fields: dpid or function_index.")
             return jsonify({'error': 'device_id and function_index is required'}), 400
         
         device = Device.query.filter_by(dpid=int(dpid)).first()
         if not device:
+            logging.error(f"Device {dpid} not found in the database.")
             return jsonify({'error': f'Device {dpid} not found in teh database.'}), 404
+        
         function = DeviceFunction.query.filter_by(device_id=device.id,index=function_index).first()
         if not function:
+            logging.error(f"Function at index {function_index} not found on device {dpid}")
             return jsonify({'error': f'Function at index {function_index} not found on device {dpid}.'}), 404
         
         app = current_app._get_current_object()
         if not hasattr(app, 'eBPFApp'):
+            logging.error("Controller is not running.")
             return jsonify({'error': 'Controller is not running'}), 400
         
         controller = app.eBPFApp
         # Get the connection to the device
         connection = controller.connections.get(int(dpid))
         if not connection:
+            logging.error(f"Device {dpid} is not connected.")
             return jsonify({'error': f'Device {dpid} is not connected'}), 400
         
         # Send the FunctionRemoveRequest
+        logging.info(f"Attempting to remove function at index {function_index} on device {dpid}")
         function_remove_request = FunctionRemoveRequest(index=function_index)
         connection.send(function_remove_request)
 

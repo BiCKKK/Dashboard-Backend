@@ -386,6 +386,17 @@ class eBPFCLIApplication(eBPFCoreApplication):
                         if device_function:
                             db.session.delete(device_function)
                             db.session.commit()
+
+                        subsequent_functions = DeviceFunction.query.filter(
+                            DeviceFunction.device_id == device_id,
+                            DeviceFunction.index > index
+                        ).order_by(DeviceFunction.index).all()
+
+                        for func in subsequent_functions:
+                            func.index -= 1
+                            logging.info(f"Updated function {func.function_name} to index {func.index}.")
+
+                        db.session.commit()
                 else:
                     logging.error(f"Function removal failed on device {device_id} at index {index}, status: {status}.")
 
