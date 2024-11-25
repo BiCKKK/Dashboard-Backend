@@ -273,13 +273,29 @@ int recv_function_remove(void *buffer, struct header *header)
     reply.status = FUNCTION_REMOVE_REPLY__FUNCTION_REMOVE_STATUS__INVALID_STAGE;
     reply.index = request->index;
     
-    if (request->index <= PIPELINE_STAGES && pipeline[request->index].vm != NULL)
+    if (request->index < PIPELINE_STAGES && pipeline[request->index].vm != NULL)
     {
         struct stage *stage = &pipeline[request->index];
         ubpf_destroy(stage->vm);
 
         // Clear the previous state of the stage
         memset(stage, 0, sizeof(struct stage));
+
+	for (int i = request->index + 1; i < PIPELINE_STAGES; i++)
+	{
+		struct stage *current_stage = &pipeline[i];
+		struct stage *previous_stage = &pipeline[i - 1];
+
+		if (current_stage->vm !=NULL)
+		{
+			memcpy(previous_stage, current_stage, sizeof(struct stage));
+			memset(current_stage, 0, sizeof(struct stage));
+		}
+		else
+		{
+			break;
+		}
+	}
 
         reply.status = FUNCTION_REMOVE_REPLY__FUNCTION_REMOVE_STATUS__OK;
     }
