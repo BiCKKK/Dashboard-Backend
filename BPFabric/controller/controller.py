@@ -12,40 +12,6 @@ from core.packets import *
 from shared import db
 from shared.models import Device, DeviceFunction, EventLog, MonitoringData, PacketCapture, AssetDiscovery, GooseAnalysisData
 
-def extract_mac_address(packet_data):
-    """
-    Extracts the MAC address from the packet data.
-    Adjust byte offsets based on packet structure.
-    """
-    return packet_data[6:12].hex()
-
-def extract_source_ip(packet_data):
-    """
-    Extracts the source IP address from the packet data.
-    Adjust byte offsets based on packet structure.
-    """
-    return f"{packet_data[26]}.{packet_data[27]}.{packet_data[28]}.{packet_data[29]}"
-
-def extract_destination_ip(packet_data):
-    """
-    Extracts the destination IP address from the packet data.
-    Adjust byte offsets based on packet structure.
-    """
-    return f"{packet_data[30]}.{packet_data[31]}.{packet_data[32]}.{packet_data[33]}"
-
-def determine_protocol(packet_data):
-    """
-    Determines the protocol from the packet data.
-    Adjust byte offsets based on packet structure.
-    """
-    protocol_number = packet_data[23]
-    protocol_map = {
-        6: 'TCP',
-        17: 'UDP',
-        1: 'ICMP'
-    }
-    return protocol_map.get(protocol_number, 'unknown')
-
 
 class eBPFCLIApplication(eBPFCoreApplication):
     """
@@ -56,7 +22,7 @@ class eBPFCLIApplication(eBPFCoreApplication):
         self.app = app
         self.connected_devices = set()
         self.connections = {}
-        self.monitoring_cache = {} # To track previous bytes for bandwidth calculation
+        self.monitoring_cache = {}
         self.pending_functions ={}
 
     def run(self):
@@ -89,156 +55,63 @@ class eBPFCLIApplication(eBPFCoreApplication):
                 return {"packets": 0, "bytes": 0}
             
             value_bytes = int.from_bytes(bytes.fromhex(hex_value[:8]), byteorder="little")
-            value_packets = int.from_bytes(bytes.fromhex(hex_value[:8]), byteorder="little")
-            return {"packets": value_packets, "bytes": value_bytes}
+            value_packets = int.from_bytes(bytes.fromhex(hex_value[8:16]), byteorder="little")
+            logging.debug(f"Parsed value - Bytes: {value_bytes}, Packets: {value_packets}")
+            return {"bytes": value_bytes, "packets": value_packets}
         except Exception as e:
             logging.error(f"Error parsing value bytes and packets: {e}")
-            return {"packets": 0, "bytes": 0}
+            return {"bytes": 0, "packets": 0}
 
     @set_event_handler(Header.TABLE_LIST_REPLY)
     def table_list_reply(self, connection, pkt):
-        if pkt.entry.table_name == "assetdisc":
-            self.asset_disc_list(connection.dpid, pkt)
-            return
-
-        if pkt.entry.table_name == "monitor":
-            self.monitoring_list(connection.dpid, pkt)
-            return
-
-        if pkt.entry.table_name == "goose_analyser":
-            self.goose_analyser_list(connection.dpid, pkt)
-            return
+        try:
+            if pkt.entry.table_name == "monitor":
+                logging.info(f"Received monitoring data reply from device {connection.dpid}, table: {pkt.entry.table_name}.")
+                self.monitoring_list(connection.dpid, pkt)
+        except Exception as e:
+            logging.error(f"Error in TABLE_LIST_REPLY: {e}")
         
-        entries = []
-
-        if pkt.entry.table_type in [TableDefinition.HASH, TableDefinition.LPM_TRIE]:
-            item_size = pkt.entry.key_size + pkt.entry.value_size
-            fmt = "{}s{}s".format(pkt.entry.key_size, pkt.entry.value_size)
-
-            for i in range(pkt.n_items):
-                key, value = struct.unpack_from(fmt, pkt.items, i * item_size)
-                entries.append((key.hex(), value.hex()))
-
-        elif pkt.entry.table_type == TableDefinition.ARRAY:
-            item_size = pkt.entry.value_size
-            fmt = "{}s".format(pkt.entry.value_size)
-
-            for i in range(pkt.n_items):
-                value = struct.unpack_from(fmt, pkt.items, i * item_size)[0]
-                entries.append((i, value.hex()))
-
     def monitoring_list(self, dpid, pkt):
-        item_size = pkt.entry.key_size + pkt.entry.value_size
-        fmt = "{}s{}s".format(pkt.entry.key_size, pkt.entry.value_size)
+        try: 
+            logging.info(f"Processing monitoring data for device {dpid}.")
+            item_size = pkt.entry.key_size + pkt.entry.value_size
+            fmt = f"{pkt.entry.key_size}s{pkt.entry.value_size}s"
 
-        timestamp = datetime.now(timezone.utc)
+            with self.app.app_context():
+                for i in range(pkt.n_items):
+                    key, value = struct.unpack_from(fmt, pkt.items, i * item_size)
 
-        for i in range(pkt.n_items):
-            key, value = struct.unpack_from(fmt, pkt.items, i * item_size)
-            valStr = self.parse_values_bytes_packets(value)
-            bytes_total = int(valStr['bytes'])
-            mac_address = key.hex()
-            
-            # Retrieve or create a monitoring record
-            monitoring_record = MonitoringData.query.filter_by(
-                device_id=dpid,
-                mac_address=mac_address
-            ).order_by(MonitoringData.timestamp.desc()).first()
+                    mac_address = key.hex()
+                    logging.debug(f"Processing MAC address: {mac_address}")
 
-            previous_bytes = monitoring_record.bandwidth if monitoring_record else 0
-            bandwidth = bytes_total - previous_bytes
+                    value_data = self.parse_values_bytes_packets(value)
+                    bytes_total = value_data['bytes']
 
-            if bandwidth > 0:
-                new_monitoring = MonitoringData(
-                    timestamp=timestamp,
-                    device_id=dpid,
-                    mac_address=mac_address,
-                    bandwidth=bandwidth
-                )
-                db.session.add(new_monitoring)
-                try:
-                    db.session.commit()
-                except Exception as e:
-                    logging.error(f"Failed to insert MonitoringData: {e}")
-                    db.session.rollback()
+                    previous_bytes = self.monitoring_cache.get(mac_address, 0)
+                    bandwidth = max(0, bytes_total - previous_bytes)
+                    self.monitoring_cache[mac_address] = bytes_total
+                    logging.debug(f"Calculated bandwidth for {mac_address}: {bandwidth} bytes/sec.")
+
+                    monitoring_data = MonitoringData(
+                        timestamp=datetime.now(timezone.utc),
+                        device_id=dpid,
+                        mac_address=mac_address, 
+                        bandwidth=bandwidth
+                    )
+                    db.session.add(monitoring_data)
+
+                db.session.commit()
+                logging.info(f"Monitoring data stored for device {dpid}.")
+        
+        except Exception as e:
+            logging.error(f"Error processing monitoring data stored for device {dpid}: {e}")
+            db.session.rollback()
 
     def goose_analyser_list(self, dpid, pkt):
-        item_size = pkt.entry.key_size + pkt.entry.value_size
-        fmt = "{}s{}s".format(pkt.entry.key_size, pkt.entry.value_size)
-
-        timestamp = datetime.now(timezone.utc)
-
-        for i in range(pkt.n_items):
-            key, value = struct.unpack_from(fmt, pkt.items, i * item_size)
-            parsed_values = self.parse_values_bytes_packets(value)
-            mac_address = key.hex()
-            st_num = parsed_values.get('packets')
-            sq_num = parsed_values.get('bytes')
-
-            # Retrieve or create a GooseAnalysisData record
-            goose_record = GooseAnalysisData.query.filter_by(
-                device_id=dpid,
-                mac_address=mac_address
-            ).order_by(GooseAnalysisData.timestamp.desc()).first()
-
-            if goose_record:
-                goose_record.stNum = st_num,
-                goose_record.sqNum = sq_num,
-                goose_record.timestamp = timestamp
-            else:
-                new_goose = GooseAnalysisData(
-                    timestamp=timestamp,
-                    device_id=dpid,
-                    mac_address=mac_address,
-                    stNum=st_num,
-                    sqNum=sq_num
-                )
-                db.session.add(new_goose)
-            
-            try:
-                db.session.commit()
-            except Exception as e:
-                logging.error(f"Failed to insert GooseAnalysisData: {e}")
-                db.session.rollback()
+        pass
 
     def asset_disc_list(self, dpid, pkt):
-        item_size = pkt.entry.key_size + pkt.entry.value_size
-        fmt = "{}s{}s".format(pkt.entry.key_size, pkt.entry.value_size)
-
-        timestamp = datetime.now(timezone.utc)
-
-        for i in range(pkt.n_items):
-            key, value = struct.unpack_from(fmt, pkt.items, i * item_size)
-            parsed_values = self.parse_values_bytes_packets(value)
-            mac_address = key.hex()
-            bytes_total = parsed_values.get('bytes')
-            packets_count = parsed_values.get('packets')
-
-            # Retrieve or create an AssetDiscovery record
-            asset_record = AssetDiscovery.query.filter_by(
-                switch_id=dpid,
-                mac_address=mac_address
-            ).order_by(AssetDiscovery.timestamp.desc()).first()
-
-            if asset_record:
-                asset_record.bytes = bytes_total
-                asset_record.packets = packets_count
-                asset_record.timestamp = timestamp
-            else:
-                new_asset = AssetDiscovery(
-                    timestamp=timestamp, 
-                    switch_id=dpid,
-                    mac_address=mac_address,
-                    bytes=bytes_total,
-                    packets=packets_count
-                )
-                db.session.add(new_asset)
-
-            try:
-                db.session.commit()
-            except Exception as e:
-                logging.error(f"Failed to insert AssetDiscovery: {e}")
-                db.session.rollback()
+        pass
 
     @set_event_handler(Header.NOTIFY)
     def notify_event(self, connection, pkt):
@@ -281,37 +154,7 @@ class eBPFCLIApplication(eBPFCoreApplication):
 
     @set_event_handler(Header.PACKET_IN)
     def packet_in(self, connection, pkt):
-        """
-        Handles PACKET_IN events by logging and storing packet data.
-        """
-        logging.info(f"[{connection.dpid}] Received packet in {len(pkt.data)} bytes.")
-        logging.debug(f"Packet Data: {pkt.data.hex()}")
-
-        # Save packet data to the database
-        with self.app.app_context():
-            new_packet = PacketCapture(
-                timestamp=datetime.now(timezone.utc),
-                device_id=connection.dpid,
-                packet_data=pkt.data,
-                source_ip=extract_source_ip(pkt.data),
-                destination_ip=extract_destination_ip(pkt.data),
-                protocol=determine_protocol(pkt.data)
-            )
-            db.session.add(new_packet)
-
-            try:
-                db.session.commit()
-            except Exception as e:
-                logging.error(f"Failed to insert Packet data: {e}")
-                db.session.rollback()
-
-    @set_event_handler(Header.FUNCTION_LIST_REPLY)
-    def function_list_reply(self, connection, pkt):
-        for entry in pkt.entries:
-            name = entry.name
-            index = entry.index or 0
-            counter = entry.counter or 0
-            pass
+        pass
 
     @set_event_handler(Header.FUNCTION_ADD_REPLY)
     def function_add_reply(self, connection, pkt):
@@ -456,12 +299,14 @@ def start_monitoring(app, connections):
     def threaded_mon_timer():
         while True:
             with app.app_context():
-                if 6 in connections:
-                    connections[6].send(TableListRequest(index=0, table_name="monitor"))
-                if 7 in connections:
-                    connections[7].send(TableListRequest(index=0, table_name="goose_analyser"))
-            logging.info("Sending monitoring request")
-            time.sleep(1)
+                for dpid, connection in connections.items():
+                    try:
+                        connection.send(TableListRequest(index=0, table_name="monitor"))
+                        logging.info(f"Sent monitoring request to device {dpid}.")
+                    except Exception as e:
+                        logging.error(f"Error sending monitoring request to device {dpid}: {e}")
+            time.sleep(30)
 
-    thread = Thread(target=threaded_mon_timer)
+    thread = Thread(target=threaded_mon_timer, daemon=True)
     thread.start()
+    logging.info("Started periodic monitoring requests.")

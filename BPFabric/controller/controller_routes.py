@@ -3,9 +3,9 @@ from threading import Thread
 import json
 import logging
 
-from controller import eBPFCLIApplication
+from controller import eBPFCLIApplication, start_monitoring
 from shared import db
-from shared.models import Device, Link, DeviceFunction
+from shared.models import Device, Link, DeviceFunction, MonitoringData
 
 from core.packets import *
 
@@ -137,6 +137,10 @@ def install_function():
         connection.send(function_add_request)
         logging.info(f"Function installation request sent to device {dpid} for function {function_name}.")
 
+        if function_name == 'monitoring':
+            start_monitoring(app, controller.connections)
+            logging.info(f"Started monitoring requests after installating function {function_name} on device {dpid}.")
+
         return jsonify({'message': f'Function installation initiated on device {dpid}'}), 200
     
     except Exception as e:
@@ -188,3 +192,32 @@ def remove_function():
         logging.error(f"Error removing function: {e}")
         return jsonify({'error': 'Failed to initiate function removal'}), 500
 
+@controller_routes.route('/monitoring_data', methods=['GET'])
+def get_monitoring_data():
+    try:
+        device_id = request.args.get('device_id')
+        mac_address = request.args.get('mac_address')
+        limit = request.args.get('limit', 100, type=int)
+
+        query = MonitoringData.query
+        if device_id:
+            query = query.filter(MonitoringData.device_id == int(device_id))
+        if mac_address:
+            query = query.filter(MonitoringData.mac_address == mac_address)
+
+        monitoring_data = query.order_by(MonitoringData.timestamp.desc()).limit(limit).all()
+
+        results = [
+            {
+                "timestamp": data.timestamp.isoformat(),
+                "device_id": data.device_id,
+                "mac_address": data.mac_address,
+                "bandwidth": data.bandwidth
+            }
+            for data in monitoring_data
+        ]
+
+        return jsonify(results), 200
+    except Exception as e:
+        logging.error(f"Error fetching monitoring data: {e}")
+        return jsonify({"error": "Failed to retrieve monitoring data."}), 500
