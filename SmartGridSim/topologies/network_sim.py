@@ -211,7 +211,7 @@ def stop_network(app):
         logging.error(f"Error during shutdown: {e}")
         return False
     
-def sgsim_packet_count(self, line):
+def sgsim_packet_count():
     "Counts received packets on every end device in the topology" 
     if not simulation_running:
         logging.warning("Simulation is not running.") 
@@ -256,7 +256,7 @@ def sgsim_startcom_sv():
     net.get('DPSHMI').cmd('xterm -e "cd ../comlib_dps/sgdevices/DPSHMI_SV/;./dpshmi_sv 3" &') 
     time.sleep(0.5)
 
-def sgsim_startcom_104(self, line):
+def sgsim_startcom_104():
     "Starts the IEC104 communication (periodical and read requests) for both secondary substations." 
     if not simulation_running:
         logging.warning("Simulation is not running.") 
@@ -270,7 +270,7 @@ def sgsim_startcom_104(self, line):
     time.sleep(0.5)
     net.get('CONTROL').cmd('xterm -e "cd ../comlib_dss/sgdevices/CONTROL/;sleep 1;./control 1.1.2.1" &')
       
-def sgsim_attack_dos(self, line):
+def sgsim_attack_dos():
     "Starts the DoS attack from DSS1RTU on the control center." 
     if not simulation_running:
         logging.warning("Simulation is not running.") 
