@@ -2,10 +2,11 @@ from flask import Blueprint, request, jsonify, current_app
 from threading import Thread
 import json
 import logging
+import datetime
 
 from controller import eBPFCLIApplication, start_monitoring
 from shared import db
-from shared.models import Device, Link, DeviceFunction, MonitoringData
+from shared.models import Device, Link, DeviceFunction, MonitoringData, AssetDiscovery
 
 from core.packets import *
 
@@ -221,3 +222,56 @@ def get_monitoring_data():
     except Exception as e:
         logging.error(f"Error fetching monitoring data: {e}")
         return jsonify({"error": "Failed to retrieve monitoring data."}), 500
+    
+@controller_routes.route('/asset_discovery_data', methods=['GET'])
+def get_asset_discovery_data():
+    try:
+        device_id = request.args.get('device_id', type=int)
+        dpid = request.args.get('dpid', type=int)
+        mac_address = request.args.get('mac_address')
+        limit = request.args.get('limit', default=100, type=int)
+        start_time_str = request.args.get('start_time')
+        end_time_str = request.args.get('end_time')
+        
+        if not device_id and not dpid:
+            return jsonify({'error': 'Either device_id or dpid must be provided.'}), 400
+        
+        start_time = None
+        end_time = None
+        if start_time_str:
+            start_time = datetime.fromisoformat(start_time_str)
+        if end_time_str:
+            end_time = datetime.fromisoformat(end_time_str)
+        
+        if dpid and not device_id:
+            device = Device.query.filter_by(dpid=dpid).first()
+            if device:
+                device_id = device.id
+            else:
+                return jsonify({'error': f'Device with dpid {dpid} not found.'}), 404
+        
+        query = AssetDiscovery.query.filter_by(switch_id=device_id)
+        if mac_address:
+            query = query.filter(AssetDiscovery.mac_address == mac_address)
+        if start_time:
+            query = query.filter(AssetDiscovery.timestamp >= start_time)
+        if end_time:
+            query = query.filter(AssetDiscovery.timestamp <= end_time)
+        
+        asset_data = query.order_by(AssetDiscovery.timestamp.desc()).limit(limit).all()
+        
+        results = [
+            {
+                'timestamp': data.timestamp.isoformat(),
+                'switch_id': data.switch_id,
+                'mac_address': data.mac_address,
+                'bytes': data.bytes,
+                'packets': data.packets
+            }
+            for data in asset_data
+        ]
+        return jsonify(results), 200
+    
+    except Exception as e:
+        logging.error(f"Error fetching asset discovery data: {e}")
+        return jsonify({'error': 'Failed to retrieve asset discovery data.'}), 500

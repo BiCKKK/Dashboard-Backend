@@ -6,12 +6,13 @@ from datetime import datetime, timezone
 from threading import Thread
 from twisted.internet import reactor
 
+from flask_socketio import emit
+
 from core import eBPFCoreApplication, set_event_handler
 from core.packets import *
 
 from shared import db
 from shared.models import Device, DeviceFunction, EventLog, MonitoringData, PacketCapture, AssetDiscovery, GooseAnalysisData
-
 
 class eBPFCLIApplication(eBPFCoreApplication):
     """
@@ -68,6 +69,9 @@ class eBPFCLIApplication(eBPFCoreApplication):
             if pkt.entry.table_name == "monitor":
                 logging.info(f"Received monitoring data reply from device {connection.dpid}, table: {pkt.entry.table_name}.")
                 self.monitoring_list(connection.dpid, pkt)
+            elif pkt.entry.table_name == "assetdisc":
+                logging.info(f"Received asset discovery data reply from device {connection.dpid}, table: {pkt.entry.table_name}.")
+                self.asset_disc_list(connection.dpid, pkt)
         except Exception as e:
             logging.error(f"Error in TABLE_LIST_REPLY: {e}")
         
@@ -107,10 +111,43 @@ class eBPFCLIApplication(eBPFCoreApplication):
             logging.error(f"Error processing monitoring data stored for device {dpid}: {e}")
             db.session.rollback()
 
-    def goose_analyser_list(self, dpid, pkt):
-        pass
-
     def asset_disc_list(self, dpid, pkt):
+        try:
+            logging.info(f"Processing asset discovery data for device {dpid}.")
+            item_size = pkt.entry.key_size + pkt.entry.value_size
+            fmt = f"{pkt.entry.key_size}s{pkt.entry.value_size}s"
+
+            with self.app.app_context():
+                for i in range(pkt.n_items):
+                    key, value = struct.unpack_from(fmt, pkt.items, i * item_size)
+
+                    mac_address = ':'.join(f'{b:02x}' for b in key)
+                    logging.debug(f"Processing MAC address: {mac_address}")
+
+                    if len(value) != 8:
+                        logging.error(f"Invalid value size: expected 8 bytes, got {len(value)} bytes.")
+                        continue
+
+                    bytes_count, packets_count = struct.unpack('<II', value)
+                    logging.debug(f"Bytes: {bytes_count}, Packets: {packets_count}")
+
+                    asset_discovery = AssetDiscovery(
+                        timestamp=datetime.now(timezone.utc),
+                        switch_id=dpid,
+                        mac_address=mac_address,
+                        bytes=bytes_count,
+                        packets=packets_count
+                    )
+                    db.session.add(asset_discovery)
+                
+                db.session.commit()
+                logging.info(f"Asset discovery data stored for device {dpid}")
+
+        except Exception as e:
+            logging.error(f"Error processing asset discovery data for device {dpid}: {e}")
+            db.session.rollback()
+
+    def goose_analyser_list(self, dpid, pkt):
         pass
 
     @set_event_handler(Header.NOTIFY)
