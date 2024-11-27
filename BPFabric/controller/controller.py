@@ -76,7 +76,7 @@ class eBPFCLIApplication(eBPFCoreApplication):
             logging.error(f"Error in TABLE_LIST_REPLY: {e}")
         
     def monitoring_list(self, dpid, pkt):
-        try: 
+        try:
             logging.info(f"Processing monitoring data for device {dpid}.")
             item_size = pkt.entry.key_size + pkt.entry.value_size
             fmt = f"{pkt.entry.key_size}s{pkt.entry.value_size}s"
@@ -84,32 +84,37 @@ class eBPFCLIApplication(eBPFCoreApplication):
             with self.app.app_context():
                 for i in range(pkt.n_items):
                     key, value = struct.unpack_from(fmt, pkt.items, i * item_size)
-
+                    
                     mac_address = key.hex()
                     logging.debug(f"Processing MAC address: {mac_address}")
 
                     value_data = self.parse_values_bytes_packets(value)
                     bytes_total = value_data['bytes']
 
-                    previous_bytes = self.monitoring_cache.get(mac_address, 0)
-                    bandwidth = max(0, bytes_total - previous_bytes)
-                    self.monitoring_cache[mac_address] = bytes_total
-                    logging.debug(f"Calculated bandwidth for {mac_address}: {bandwidth} bytes/sec.")
+                    if mac_address not in self.monitoring_cache:
+                        self.monitoring_cache[mac_address] = 0
 
-                    monitoring_data = MonitoringData(
-                        timestamp=datetime.now(timezone.utc),
-                        device_id=dpid,
-                        mac_address=mac_address, 
-                        bandwidth=bandwidth
-                    )
-                    db.session.add(monitoring_data)
+                    bandwidth = bytes_total - self.monitoring_cache[mac_address]
+            
+                    if bandwidth > 0:
+                        monitoring_data = MonitoringData(
+                            timestamp=datetime.now(timezone.utc),
+                            device_id=dpid,
+                            mac_address=mac_address,
+                            bandwidth=bandwidth
+                        )
+                        db.session.add(monitoring_data)
+                        logging.debug(f"Stored bandwidth for {mac_address}: {bandwidth} bytes/sec")
+
+                    self.monitoring_cache[mac_address] = bytes_total
 
                 db.session.commit()
                 logging.info(f"Monitoring data stored for device {dpid}.")
         
         except Exception as e:
-            logging.error(f"Error processing monitoring data stored for device {dpid}: {e}")
+            logging.error(f"Error processing monitoring data for device {dpid}: {e}")
             db.session.rollback()
+
 
     def asset_disc_list(self, dpid, pkt):
         try:
