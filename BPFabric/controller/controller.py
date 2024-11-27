@@ -115,39 +115,37 @@ class eBPFCLIApplication(eBPFCoreApplication):
             logging.error(f"Error processing monitoring data for device {dpid}: {e}")
             db.session.rollback()
 
-
     def asset_disc_list(self, dpid, pkt):
         try:
             logging.info(f"Processing asset discovery data for device {dpid}.")
             item_size = pkt.entry.key_size + pkt.entry.value_size
             fmt = f"{pkt.entry.key_size}s{pkt.entry.value_size}s"
-
             with self.app.app_context():
+                
+                device = Device.query.filter_by(dpid=dpid).first()
+                if not device:
+                    logging.error(f"Device with DPID {dpid} not found in the database.")
+                    return
+                device_id = device.id
                 for i in range(pkt.n_items):
                     key, value = struct.unpack_from(fmt, pkt.items, i * item_size)
-
                     mac_address = ':'.join(f'{b:02x}' for b in key)
                     logging.debug(f"Processing MAC address: {mac_address}")
-
                     if len(value) != 8:
                         logging.error(f"Invalid value size: expected 8 bytes, got {len(value)} bytes.")
                         continue
-
                     bytes_count, packets_count = struct.unpack('<II', value)
                     logging.debug(f"Bytes: {bytes_count}, Packets: {packets_count}")
-
                     asset_discovery = AssetDiscovery(
                         timestamp=datetime.now(timezone.utc),
-                        switch_id=dpid,
+                        switch_id=device_id,  
                         mac_address=mac_address,
                         bytes=bytes_count,
                         packets=packets_count
                     )
                     db.session.add(asset_discovery)
-                
                 db.session.commit()
                 logging.info(f"Asset discovery data stored for device {dpid}")
-
         except Exception as e:
             logging.error(f"Error processing asset discovery data for device {dpid}: {e}")
             db.session.rollback()
