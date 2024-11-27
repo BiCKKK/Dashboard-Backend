@@ -342,7 +342,7 @@ def start_monitoring(app, connections):
                         logging.info(f"Sent monitoring request to device {dpid}.")
                     except Exception as e:
                         logging.error(f"Error sending monitoring request to device {dpid}: {e}")
-            time.sleep(30)
+            time.sleep(1)
 
     thread = Thread(target=threaded_mon_timer, daemon=True)
     thread.start()
