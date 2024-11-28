@@ -1,9 +1,5 @@
-# network_sim.py
 import logging
 import time
-import subprocess
-import signal
-import socket
 from mininet.net import Mininet
 from mininet.node import RemoteController
 from mininet.link import TCLink
@@ -16,7 +12,6 @@ from shared import db
 from shared.models import Device, Link, EventLog
 
 import threading
-import json
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -26,20 +21,18 @@ net = None
 simulation_running = False
 simulation_lock = threading.Lock()
 
-def wait_for_controller(ip, port, timeout=30):
-    start_time = time.time()
-    while time.time() - start_time < timeout:
-        try: 
-            with socket.create_connection((ip, port), timeout=1):
-                logging.info("Controller is available.")
-                return True
-        except OSError:
-            logging.info("Waiting for controller to be available...")
-            time.sleep(1)
-    logging.error("Controller did not become available in time.")
-    return False
-
 def smartGridSimNetwork(app):
+    """
+    Starts the Smart Grid network simulation using Mininet.
+
+    Args:
+        app: The flask application instance for database context.
+
+    Manages:
+        Network initialisation and topology setup.
+        Switches, host, and links.
+        Saves devices and links to the database.
+    """
     global net, simulation_running
     logging.info("Attempting to start network simulation.")
 
@@ -51,12 +44,7 @@ def smartGridSimNetwork(app):
         logging.info("Simulation running flag is set to True.")
     
     try:
-        controller_ip = '127.0.0.1'
-        controller_port = 5050
-
-        if not wait_for_controller(controller_ip, controller_port):
-            raise ConnectionError("Controller is not available.")
-
+        # Initailise the Mininet instance
         net = Mininet(
             topo=None,
             build=False,
@@ -66,6 +54,7 @@ def smartGridSimNetwork(app):
             controller=RemoteController
         )
 
+        # Add controller
         c0 = net.addController('c0', controller=RemoteController, ip='127.0.0.1', port=5050)
 
         switchPath = "../../BPFabric/softswitch/softswitch"
@@ -92,7 +81,7 @@ def smartGridSimNetwork(app):
         DPSHMI = net.addHost('DPSHMI', cls=eBPFHost, ip='1.1.3.10', defaultRoute='1.1.10.10', mac='00:02:b3:00:00:05')
         IDS = net.addHost('IDS', cls=eBPFHost, ip='1.1.1.8', defaultRoute='1.1.10.10', mac='00:00:0c:00:00:88')
 
-        MBPS = {'bw':10}
+        MBPS = {'bw':10} # Bandwidth configuration
 
         # Add links
         net.addLink(WANR2, CONTROLSW)
@@ -172,6 +161,20 @@ def smartGridSimNetwork(app):
             net = None
 
 def stop_network(app):
+    """
+    Stops the running network and cleans up resources.
+
+    Args:
+        app: The Flask application instance for database context.
+
+    Manages:
+        Stopping the Mininet network.
+        Cleaning up Mininet resources.
+        Resetting relevant database tables.
+
+    Returns: 
+        bool: True if the network was stopped successfully, False otherwise.
+    """
     global net, simulation_running
     with simulation_lock:
         if not simulation_running:
@@ -181,10 +184,12 @@ def stop_network(app):
 
     try:
         if net:
+            # Stop the Mininet network and cleanup.
             net.stop()
             cleanup()
             logging.info("Network simulation stopped and resources cleaned up.")
 
+            # Reset database tables
             with app.app_context():
                 tables = ['links', 'event_logs', 'device_functions', 'devices']
                 truncate_stmt = f"TRUNCATE TABLE {', '.join(tables)} RESTART IDENTITY CASCADE;"
@@ -212,11 +217,14 @@ def stop_network(app):
         return False
     
 def sgsim_packet_count():
-    "Counts received packets on every end device in the topology" 
+    """
+    Counts received packets on every end device in the topology.
+    """
     if not simulation_running:
         logging.warning("Simulation is not running.") 
         return
     logging.info("Starting packet count on devices...")
+    # Lauch tcpdump on various devices
     net.get('IED1').cmd('xterm -e "sudo tcpdump" &') 
     net.get('IED2').cmd('xterm -e "sudo tcpdump" &')
     net.get('IED3').cmd('xterm -e "sudo tcpdump" &')
@@ -226,12 +234,22 @@ def sgsim_packet_count():
     net.get('CONTROL').cmd('xterm -e "sudo tcpdump" &')
 
 def sgsim_startcom_goose():
-    "Starts the GOOSE communication in the primary substation." 
+    """
+    Starts the GOOSE communication in the primary substation.
+
+    Actions:
+        Simulates GOOSE multicast communication by adding OpenFlow rules.
+        Launches GOOSE communication on specific devices.
+    """ 
     if not simulation_running:
         logging.warning("Simulation is not running.") 
         return
     logging.info("Starting GOOSE communication...")  
-    net.get('DPSGW').cmd('ovs-ofctl add-flow DPSGW dl_type=0x88b8,action=DROP')     # Simulation of GOOSE multicast    
+
+    # Add OpenFlow rule to simulate GOOSE multicast
+    net.get('DPSGW').cmd('ovs-ofctl add-flow DPSGW dl_type=0x88b8,action=DROP') 
+
+    # Launch GOOSE communication processes on devices
     net.get('IED1').cmd('xterm -e "cd ../comlib_dps/sgdevices/IED_GOOSE/;./ied_goose IED1-eth0" &') 
     time.sleep(0.5)
     net.get('IED4').cmd('xterm -e "cd ../comlib_dps/sgdevices/IED_GOOSE/;./ied_goose IED4-eth0" &') 
@@ -241,12 +259,22 @@ def sgsim_startcom_goose():
     #net.get('DPSHMI').cmdPrint('xterm -e "cd ../comlib_dps/sgdevices/DPSHMI_GOOSE/;./dpshmi" &') 
 
 def sgsim_startcom_sv():
-    "Starts the SV communication in the primary substation." 
+    """
+    Starts the SV communication in the primary substation.
+
+    Actions:
+        Adds OpenFlow rules for SV multicast simulation.
+        Launches SV communication processes on devices.
+    """ 
     if not simulation_running:
         logging.warning("Simulation is not running.") 
         return
     logging.info("Starting SV communication...")  
-    net.get('DPSGW').cmd('ovs-ofctl add-flow DPSGW dl_type=0x88ba,action=DROP')     # Simulation of SV multicast 
+
+    # Add OpenFlow rule to simulate SV multicast
+    net.get('DPSGW').cmd('ovs-ofctl add-flow DPSGW dl_type=0x88ba,action=DROP') 
+
+    # Lauch SV communication processes on devices
     net.get('IED2').cmd('xterm -e "cd ../comlib_dps/sgdevices/IED_SV/;./ied_sv IED2-eth0" &') 
     time.sleep(0.5)
     net.get('IED3').cmd('xterm -e "cd ../comlib_dps/sgdevices/IED_SV/;./ied_sv IED3-eth0" &') 
@@ -257,7 +285,12 @@ def sgsim_startcom_sv():
     time.sleep(0.5)
 
 def sgsim_startcom_104():
-    "Starts the IEC104 communication (periodical and read requests) for both secondary substations." 
+    """
+    Starts the IEC104 communication for both secondary substations.
+
+    Actions:
+        Launches IEC104 communication processes on RTUs and control devices.
+    """ 
     if not simulation_running:
         logging.warning("Simulation is not running.") 
         return
@@ -271,7 +304,12 @@ def sgsim_startcom_104():
     net.get('CONTROL').cmd('xterm -e "cd ../comlib_dss/sgdevices/CONTROL/;sleep 1;./control 1.1.2.1" &')
       
 def sgsim_attack_dos():
-    "Starts the DoS attack from DSS1RTU on the control center." 
+    """
+    Starts the DoS attack from DSS1RTU on the control center.
+
+    Actions:
+        Launches a flood attack using hping3 on the control center's IP.
+    """ 
     if not simulation_running:
         logging.warning("Simulation is not running.") 
         return
@@ -279,7 +317,9 @@ def sgsim_attack_dos():
     net.get('DSS1RTU').cmd('xterm -e "sudo hping3 -S --flood 1.1.10.10" &') 
 
 def sgsim_startcom_sglab_goose():
-    "Starts the GOOSE communication according to the SG LAB data." 
+    """
+    Starts the GOOSE communication according to the SG LAB data.
+    """ 
     if not simulation_running:
         logging.warning("Simulation is not running.") 
         return
@@ -290,7 +330,11 @@ def sgsim_startcom_sglab_goose():
     net.get('DPSHMI').cmd('xterm -e "cd ../comlib_dps/sgdevices/DPSHMI_GOOSE/;./dpshmi" &') 
 
 def sgsim_attack_goose_fdi():
-    "Starts the False Data Injection attack on GOOSE communication." 
+    """
+    Starts the False Data Injection (FDI) attack on GOOSE communication.
+
+    Note: Attacker device has not been added to the current network simulation.
+    """ 
     if not simulation_running:
         logging.warning("Simulation is not running.") 
         return
@@ -300,7 +344,9 @@ def sgsim_attack_goose_fdi():
     net.get('DPSHMI').cmd('xterm -e "cd ../comlib_dps/sgdevices/DPSHMI_GOOSE/;./dpshmi" &') 
 
 def sgsim_startperfmon():
-    "Starts the IEC104 communication (periodical and read requests) with performance monitoring." 
+    """
+    Starts the IEC104 communication with performance monitoring.
+    """ 
     if not simulation_running:
         logging.warning("Simulation is not running.") 
         return
@@ -314,7 +360,14 @@ def sgsim_startperfmon():
     net.get('CONTROL').cmd('xterm -e "cd ../comlib_dss/sgdevices/PERFMON/;sleep 1;./perfmon 1.1.2.1" &')  
 
 def sgsim_attackmirror():
-    "Makes DSS ASW devices to mirror traffic to external connections. "
+    """
+    Simulates traffic mirroring on DSS ASW devices.
+
+    Actions:
+        Add OpenFlow rules to mirror traffic.
+
+    Note: DSS1ASW and DSS2ASW are not present in the current network topology configuration.
+    """
     if not simulation_running:
         logging.warning("Simulation is not running.") 
         return

@@ -1,4 +1,3 @@
-# controller.py
 import logging
 import struct
 import time
@@ -6,17 +5,22 @@ from datetime import datetime, timezone
 from threading import Thread
 from twisted.internet import reactor
 
-from flask_socketio import emit
-
 from core import eBPFCoreApplication, set_event_handler
 from core.packets import *
 
 from shared import db
-from shared.models import Device, DeviceFunction, EventLog, MonitoringData, PacketCapture, AssetDiscovery, GooseAnalysisData
+from shared.models import Device, DeviceFunction, EventLog, MonitoringData, AssetDiscovery
 
-class eBPFCLIApplication(eBPFCoreApplication):
+class eBPFController(eBPFCoreApplication):
     """
     Service broker for the controller that provides an abstraction between the application and data plane layers.
+
+    Attributes:
+        app: Flask application instance for database context.
+        connected_devices: Set to keep track of connected devices.
+        connections: Dictionary to store device connections mapped by device ID (dpid).
+        monitoring_cache: Cache to hold monitoring data for bandwidth calculations.
+        pending_functions: Dictionary to track pending function installation requests.
     """
     def __init__(self, app):
         super().__init__()
@@ -29,10 +33,14 @@ class eBPFCLIApplication(eBPFCoreApplication):
     def run(self):
         """
         Starts the Twisted reactor in a separate daemon thread.
+
+        This allows the controller to handle asynchronous events without blocking the main applicaition.
+
+        Returns:
+            Reference to the instance for further use.
         """
         Thread(target=reactor.run, kwargs={'installSignalHandlers': 0}, daemon=True).start()
         logging.info("Twisted reactor started.")
-        # Return self for reference if needed
         return self
     
     def stop(self):
@@ -44,11 +52,32 @@ class eBPFCLIApplication(eBPFCoreApplication):
 
     @staticmethod
     def get_switch_name(dpid, db_session):
+        """
+        Retrieves the switch name corresponding to the given DPID from the database.
+
+        Args:
+            dpid: The unique identifier for the switch.
+            db_session: The database session for querying.
+
+        Returns:
+            The name of the switch if found, otherwise "unknown".
+        """
         device = db_session.query(Device).filter_by(dpid=dpid, device_type='switch').first()
         return device.name if device else "unknown"
 
     @staticmethod
     def parse_values_bytes_packets(value):
+        """
+        Parses raw byte data to extract packet and byte counts.
+
+        Args:
+            value: Raw data containing byte and packet counts.
+
+        Returns: 
+            A dictionary with parsed "bytes" and "packets" counts.
+
+        Logs errors if the data format is invalid.
+        """
         try:
             hex_value = value.hex()
             if len(hex_value) < 16:
@@ -65,6 +94,17 @@ class eBPFCLIApplication(eBPFCoreApplication):
 
     @set_event_handler(Header.TABLE_LIST_REPLY)
     def table_list_reply(self, connection, pkt):
+        """
+        Handles TABLE_LIST_REPLY events from connected devices.
+
+        Depending on the table name in the reply, it processes monitoring or asset discovery data.
+
+        Args: 
+            connection: The conneciton object representing the device.
+            pkt: The packet containing the table list reply data.
+
+        Logs errors encountered during processing.
+        """
         try:
             if pkt.entry.table_name == "monitor":
                 logging.info(f"Received monitoring data reply from device {connection.dpid}, table: {pkt.entry.table_name}.")
@@ -76,6 +116,16 @@ class eBPFCLIApplication(eBPFCoreApplication):
             logging.error(f"Error in TABLE_LIST_REPLY: {e}")
         
     def monitoring_list(self, dpid, pkt):
+        """
+        Processes monitoring data from a device and stores it in the database.
+
+        Args: 
+            dpid: The unique identifier of the device (datapath ID)
+            pkt: The packet containing monitoring data.
+
+        Calculates bandwidth usage and caches the data for future reference.
+        Logs errors and rolls back the database transaction on failure.
+        """
         try:
             logging.info(f"Processing monitoring data for device {dpid}.")
             item_size = pkt.entry.key_size + pkt.entry.value_size
@@ -116,6 +166,9 @@ class eBPFCLIApplication(eBPFCoreApplication):
             db.session.rollback()
 
     def asset_disc_list(self, dpid, pkt):
+        """
+        Processes asset discovery data from a device and stores it in the database.
+        """
         try:
             logging.info(f"Processing asset discovery data for device {dpid}.")
             item_size = pkt.entry.key_size + pkt.entry.value_size
@@ -151,6 +204,9 @@ class eBPFCLIApplication(eBPFCoreApplication):
             db.session.rollback()
 
     def goose_analyser_list(self, dpid, pkt):
+        """
+        Placeholder for GOOSE analyser functionality.
+        """
         pass
 
     @set_event_handler(Header.NOTIFY)
@@ -158,6 +214,14 @@ class eBPFCLIApplication(eBPFCoreApplication):
         """
         Handles NOTIFY events by identifying the vendor based on packets data and requesting asset
         discovery tables from the connected device.
+
+        Args:
+            connection: Represents the device connection.
+            pkt: The received packet containing event data.
+
+        Logs:
+            Information about the detected IED devices and vendors.
+            Errors if database operations or packet sends fail.
         """
         logging.info(f'[{connection.dpid}] Received notify event {pkt.id}, data length {len(pkt.data)}')
         logging.debug(f'Packet Data: {pkt.data.hex()}')
@@ -194,10 +258,26 @@ class eBPFCLIApplication(eBPFCoreApplication):
 
     @set_event_handler(Header.PACKET_IN)
     def packet_in(self, connection, pkt):
+        """
+        Placeholder for PACKET_IN events from the network.
+
+        Currently unimplemented.
+        """
         pass
 
     @set_event_handler(Header.FUNCTION_ADD_REPLY)
     def function_add_reply(self, connection, pkt):
+        """
+        Handles FUNCTION_ADD_REPLY events for the functions addition from the device.
+
+        Args: 
+            connection: Represents the device connection.
+            pkt: Packet containing the function addtion reply data.
+
+        Logs: 
+            Success or failure messages for function installation.
+            Errors during database operations.
+        """
         if pkt.status == FunctionAddReply.FunctionAddStatus.INVALID_STAGE:
             logging.error("Cannot add a function at this index")
         elif pkt.status == FunctionAddReply.FunctionAddStatus.INVALID_FUNCTION:
@@ -223,7 +303,7 @@ class eBPFCLIApplication(eBPFCoreApplication):
                         device_function = DeviceFunction(device_id=device_id, function_name=function_name, index=pkt.index, status="installed")
                         db.session.add(device_function)
                         db.session.commit()
-                        logging.info(f"Fucntion {function_name} added succesfully to device {device_id}")
+                        logging.info(f"Function {function_name} added succesfully to device {device_id}")
                     else:
                         logging.error(f"Function addition failed on device {device_id}, status: {status}")
 
@@ -235,6 +315,17 @@ class eBPFCLIApplication(eBPFCoreApplication):
             logging.error(f"Error handling function add reply: {e}")
 
     def send_function_add_request(self, connection, request):
+        """
+        Sends a request to add a function to the specified device.
+
+        Args: 
+            connection: Represents the device connection.
+            request: The function addition request.
+
+        Logs:
+            Request details and success messages.
+            Errors during the request process.
+        """
         try:
             dpid = connection.dpid
             function_name = request.name
@@ -248,6 +339,9 @@ class eBPFCLIApplication(eBPFCoreApplication):
                
     @set_event_handler(Header.FUNCTION_REMOVE_REPLY)
     def function_remove_reply(self, connection, pkt):
+        """
+        Handles FUNCTION_REMOVE_REPLY events for function removal.
+        """
         if pkt.status == FunctionRemoveReply.FunctionRemoveStatus.INVALID_STAGE:
             logging.error("Cannot remove a function from this index.")
         else:
@@ -290,6 +384,21 @@ class eBPFCLIApplication(eBPFCoreApplication):
     def hello(self, connection, pkt):
         """
         Handles HELLO events by logging new device connections.
+
+        Args:
+            connection: The device connection object.
+            pkt: Packet containing HELLO event data.
+
+        Logs:
+            Details about the device, including DPID and version.
+            New device connection events.
+        
+        Database operations:
+            Updates or adds the device entry in the database.
+            Logs the connection event.
+
+        Tracks:
+            Connected devices in the controller's state.
         """
         try:
             with self.app.app_context():
@@ -307,7 +416,6 @@ class eBPFCLIApplication(eBPFCoreApplication):
                 device = Device.query.filter_by(dpid=dpid).first()
                 if device:
                     device.status = 'connected'
-                # If device is not in the topology, a new device can be added from here in case its needed
                 else:
                     device = Device(
                         name=switch_name,
@@ -336,6 +444,20 @@ class eBPFCLIApplication(eBPFCoreApplication):
             logging.error(f"Error handling HELLO event: {e}")
 
 def start_monitoring(app, connections):
+    """
+    Starts a background thread to periodically send monitoring requests to devices.
+
+    Args:
+        app: Flask application instance for database context.
+        connections: Dictionary of device connections mapped by DPID.
+
+    Periodic Action: 
+        Sends monitoring requests to all connected devices every second.
+
+    Logs:
+        Sent monitoring requests.
+        Errors during request sending.
+    """
     def threaded_mon_timer():
         while True:
             with app.app_context():

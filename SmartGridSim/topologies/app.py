@@ -1,7 +1,7 @@
-# app.py
 import sys 
 import os 
 
+# Add the project directory to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -32,17 +32,20 @@ db.init_app(app)
 # Register routes
 app.register_blueprint(network_routes, url_prefix='/api')
 
-# Initialise SocketIO
-# socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
-
-# Import and initialise network_sim.py with socketio
-# import network_sim
-# network_sim.init_socketio(socketio)
-
-# Ensure shutdown
+# Ensure shutdown or application exit
 import atexit
 
 def shutdown():
+    """
+    Handles application shutdown by stopping the network simulation and cleaning up resources.
+
+    Actions:
+        Stops the network simulation.
+        Cleans up Mininet resources.
+
+    Ctrl+C will stop everything. To run commands in Mininet console, this needs to be removed or changed as
+    it will not only stop mininet command outputs but also shutdown flask application. 
+    """
     logging.info("Shutting down application...")
     network_sim.stop_network(app)
     cleanup()
@@ -51,5 +54,6 @@ def shutdown():
 atexit.register(shutdown)
 
 if __name__ == '__main__':
+    # Start the Flask application
     app.run(host='127.0.0.1', port=5100, debug=True, use_reloader=False)
 

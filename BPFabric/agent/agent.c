@@ -184,8 +184,8 @@ int recv_function_add(void *buffer, struct header *header)
 
     FunctionAddReply reply = FUNCTION_ADD_REPLY__INIT;
     reply.status = FUNCTION_ADD_REPLY__FUNCTION_ADD_STATUS__OK;
-    reply.index = request->index;
-    reply.name = strdup(request->name);
+    reply.index = request->index; // Capture the index from the request
+    reply.name = strdup(request->name); // Duplicate the function name for reply
 
     // Validate the input
     if (request->index >= PIPELINE_STAGES)
@@ -281,6 +281,7 @@ int recv_function_remove(void *buffer, struct header *header)
         // Clear the previous state of the stage
         memset(stage, 0, sizeof(struct stage));
 
+    // Shift subsequent stages to fill the gap left by the removed stage
 	for (int i = request->index + 1; i < PIPELINE_STAGES; i++)
 	{
 		struct stage *current_stage = &pipeline[i];
@@ -288,8 +289,8 @@ int recv_function_remove(void *buffer, struct header *header)
 
 		if (current_stage->vm !=NULL)
 		{
-			memcpy(previous_stage, current_stage, sizeof(struct stage));
-			memset(current_stage, 0, sizeof(struct stage));
+			memcpy(previous_stage, current_stage, sizeof(struct stage)); // Shift the stage
+			memset(current_stage, 0, sizeof(struct stage)); // Clear the moved stage
 		}
 		else
 		{
