@@ -1,4 +1,4 @@
-# Network Controller Dashboard Backend  
+# Network Controller Backend  
 
 This repository contains the backend for the Network Controller, which provides RESTful API endpoints to manage and monitor programmable network topologies.
 The flask service for Mininet network simulation is setup in Dashboard-Backend/SmartGridSim/topologies, and the controller flask service is setup in Dashboard-Backend/BPFabric/controller.
